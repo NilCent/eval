@@ -46,6 +46,23 @@ const (
 type Token struct {
 	Type    TokenType
 	Literal string
+	Line 	int
+}
+
+func New(t TokenType, l string, line int) Token{
+	return Token{
+		Type: t,
+		Literal: l,
+		Line: line,
+	}
+}
+
+func (t *Token) String() string {
+	return string(t.Type) + " " + t.Literal
+}
+
+func (t *Token) Is(ty TokenType) bool {
+	return t.Type == ty
 }
 
 var keywords = map[string]TokenType{

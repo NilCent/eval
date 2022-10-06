@@ -4,7 +4,6 @@ import (
 	"github.com/NilCent/eval/ast"
 	"github.com/NilCent/eval/lexer"
 	"github.com/NilCent/eval/token"
-	"fmt"
 )
 
 const (
@@ -31,13 +30,12 @@ var precedences = map[token.TokenType]int{
 }
 
 type (
-	prefixParseFn func() ast.Expression
-	infixParseFn  func(ast.Expression) ast.Expression
+	prefixParseFn func() (ast.Expression, error)
+	infixParseFn  func(ast.Expression) (ast.Expression, error)
 )
 
 type Parser struct {
 	l      *lexer.Lexer
-	errors []string
 
 	curToken  token.Token
 	peekToken token.Token
@@ -49,7 +47,6 @@ type Parser struct {
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		l:      l,
-		errors: []string{},
 	}
 
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
@@ -74,9 +71,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.GT, p.parseInfixExpression)
 
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
-	
-	p.nextToken()
-	p.nextToken()
+	//todo advance 两次
 	return p
 }
 
@@ -102,40 +97,39 @@ func (p *Parser) peekPrecedence() int {
 
 	return LOWEST
 }
-func (p *Parser) nextToken() {
+func (p *Parser) advance() error{
 	p.curToken = p.peekToken
-	p.peekToken = p.l.NextToken()
-}
-
-func (p *Parser) curTokenIs(t token.TokenType) bool {
-	return p.curToken.Type == t
-}
-
-func (p *Parser) peekTokenIs(t token.TokenType) bool {
-	return p.peekToken.Type == t
-}
-
-func (p *Parser) expectPeek(t token.TokenType) bool {
-	if p.peekTokenIs(t) {
-		p.nextToken()
-		return true
-	} else {
-		p.peekError(t)
-		return false
+	if p.curToken.Is(token.EOF) {
+		return nil
 	}
+	tok, err := p.l.NextToken()
+	if err != nil {
+		return err
+	}
+	p.peekToken = tok
+	return nil
+}
+func (p *Parser) preload() error {
+	err := p.advance()
+	if err != nil {
+		return err
+	}
+	err = p.advance()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (p *Parser) Errors() []string {
-	return p.errors
-}
-
-func (p *Parser) peekError(t token.TokenType) {
-	msg := fmt.Sprintf("expected next token to be %s, got %s instead",
-		t, p.peekToken.Type)
-	p.errors = append(p.errors, msg)
-}
-
-func (p *Parser) noPrefixParseFnError(t token.TokenType) {
-	msg := fmt.Sprintf("no prefix parse function for %s found", t)
-	p.errors = append(p.errors, msg)
+func (p *Parser) expectPeek(t token.TokenType) error {
+	if p.peekToken.Is(t) {
+		err := p.advance()
+		return err
+	} else {
+		return &ErrUnexpectedToken{
+			Line: p.peekToken.Line,
+			Expected: string(t),
+			Got: string(p.peekToken.Type),
+		}
+	}
 }

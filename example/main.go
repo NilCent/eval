@@ -14,6 +14,10 @@ func main() {
 			return x * 5;
 		}
 	}`)
+	_, err := i.EvalInt("fun(asd)")
+	if err != nil {
+		fmt.Println(err)
+	}
 	a, _ := i.EvalInt("fun(5)")
 	fmt.Println(a)
 }
